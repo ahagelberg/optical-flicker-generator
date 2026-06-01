@@ -1,4 +1,5 @@
 #include "DeviceInfo.h"
+#include "Config.h"
 
 static const char DEVICE_INFO_FIRMWARE_VERSION[] = "1.0";
 static const char DEVICE_INFO_TYPE[] = "FLICKER_DEVICE";
@@ -23,6 +24,21 @@ void DeviceInfo::writeDeviceIdHex(char* buf, size_t len) {
     utox8(SAMD21_SERIAL_WORD_2, &buf[16]);
     utox8(SAMD21_SERIAL_WORD_3, &buf[24]);
     buf[32] = '\0';
+}
+
+void DeviceInfo::writeMdnsHostname(char* buf, size_t len) {
+    if (buf == nullptr || len < DEVICE_INFO_MDNS_HOSTNAME_BUFFER_LEN) return;
+    char idHex[DEVICE_INFO_ID_HEX_BUFFER_LEN];
+    writeDeviceIdHex(idHex, sizeof(idHex));
+    memcpy(buf, MDNS_HOSTNAME_PREFIX, MDNS_HOSTNAME_PREFIX_LEN);
+    const char* suffix = &idHex[32 - MDNS_HOSTNAME_SUFFIX_LEN];
+    for (uint8_t i = 0; i < MDNS_HOSTNAME_SUFFIX_LEN; i++) {
+        char c = suffix[i];
+        if (c >= 'A' && c <= 'F')
+            c = (char)(c + ('a' - 'A'));
+        buf[MDNS_HOSTNAME_PREFIX_LEN + i] = c;
+    }
+    buf[MDNS_HOSTNAME_PREFIX_LEN + MDNS_HOSTNAME_SUFFIX_LEN] = '\0';
 }
 
 const char* DeviceInfo::deviceType() {

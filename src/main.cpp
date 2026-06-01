@@ -10,6 +10,7 @@
 #include "SocketServer.h"
 #include "WebServer.h"
 #include "ResetButton.h"
+#include "MdnsAdvertiser.h"
 #include <Ethernet.h>
 
 static const uint8_t MAC[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
@@ -24,6 +25,7 @@ Display display(flickerController, configStore);
 SocketServer socketServer(commandShell);
 WebServer webServer(flickerController, configStore);
 ResetButton resetButton(configStore);
+MdnsAdvertiser mdnsAdvertiser;
 
 void setup() {
     display.showBootSplash();
@@ -46,6 +48,7 @@ void setup() {
     display.begin();
     socketServer.begin();
     webServer.begin();
+    mdnsAdvertiser.begin();
     resetButton.begin();
 }
 
@@ -53,6 +56,7 @@ void loop() {
     serialCommand.poll();
     socketServer.poll();
     webServer.poll();
+    mdnsAdvertiser.poll();
     display.update();
     resetButton.poll();
 }

@@ -411,6 +411,31 @@ Network changes take effect after a power cycle.
 
 ---
 
+## mDNS discovery
+
+The device advertises itself on the LAN via **mDNS/DNS-SD** (UDP port 5353).
+
+| Item | Value |
+| ---- | ----- |
+| Hostname | `flicker-` + last 6 hex digits of device serial (e.g. `flicker-a1b2c3.local`) |
+| Service | `_http._tcp` on port 80 |
+
+After the device has an IP address, open `http://flicker-<suffix>.local/` in a browser, or ping the hostname:
+
+```
+ping flicker-a1b2c3.local
+```
+
+**Linux:** `avahi-browse -a | grep -i flicker`
+
+**macOS:** mDNS is built in; Safari Bonjour bookmarks also list `_http._tcp` services.
+
+**Windows:** Built-in mDNS support varies by version. Install [Bonjour Print Services](https://support.apple.com/kb/DL999) if `.local` names do not resolve.
+
+mDNS is always enabled when Ethernet has a valid IP. No configuration required.
+
+---
+
 ## Set button
 
 Short press on set button wakes the display from screensaver.

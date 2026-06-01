@@ -36,6 +36,13 @@
 #define SOCKET_PORT           23
 #define HTTP_PORT             80
 
+#define MDNS_PORT                 5353
+#define MDNS_HOSTNAME_PREFIX      "flicker-"
+#define MDNS_HOSTNAME_PREFIX_LEN  8
+#define MDNS_HOSTNAME_SUFFIX_LEN  6
+#define MDNS_HOSTNAME_BUFFER_LEN  (MDNS_HOSTNAME_PREFIX_LEN + MDNS_HOSTNAME_SUFFIX_LEN + 1)
+#define MDNS_HTTP_SERVICE_NAME    "Flicker._http"
+
 #define IPV4_STRING_BUFFER_LEN 16
 
 #define CAL_MAX_POINTS 8
