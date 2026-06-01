@@ -1,4 +1,4 @@
-# Flicker Device — Interface & Protocol Reference
+# Optical Flicker Generator — Interface & Protocol Reference
 
 ## Overview
 

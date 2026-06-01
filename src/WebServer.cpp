@@ -185,7 +185,7 @@ void WebServer::serveClient(EthernetClient& client) {
 }
 
 void WebServer::sendControlPage(EthernetClient& client) {
-    sendPageHead(client, "Flicker Device", "Control Panel");
+    sendPageHead(client, "Optical Flicker Generator", "Control Panel");
     client.println("<div class=\"nav\"><a class=\"lk\" href=\"/config\">&#9881;&nbsp;Configuration</a></div>");
     client.println("<div class=\"card\"><h2>Mode</h2>"
                    "<div class=\"f\"><label>Operating mode</label>"
