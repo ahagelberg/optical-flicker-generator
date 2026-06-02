@@ -12,7 +12,7 @@ The device exposes three interfaces:
 | HTTP API    | Ethernet          | TCP 80 | JSON               |
 
 
-All LED control goes through `FlickerController`, so frequency calibration applies uniformly regardless of which interface is used. The output is two hardware channels (MKR Zero D2 and D3) driven in lockstep with the same PWM parameters; there is no per-channel control.
+Telnet access can be enabled/disabled in configuration and is disabled by default. Parameter semantics are consistent across Serial, Telnet, and HTTP interfaces. The output is two hardware channels driven in lockstep with the same PWM parameters; there is no per-channel control.
 
 ---
 
@@ -22,8 +22,8 @@ All LED control goes through `FlickerController`, so frequency calibration appli
 
 - One command per line, terminated by `\n` or `\r\n`.
 - Command verb is **case-insensitive**; arguments are case-sensitive where noted.
-- Response is a single line terminated by `\r\n` (Arduino `println`).
-- Max line length: 128 bytes (excess bytes are discarded; the line is dropped).
+- Response is a single line terminated by `\r\n`.
+- Maximum accepted line length is 127 characters; additional characters are ignored until newline, then the truncated line is executed.
 - Partial lines with no new data for 5 s are silently discarded.
 
 ### Response format
@@ -50,7 +50,7 @@ Query device identity.
 ```
 
 Payload: `<device_type> <firmware_version> <id>`  
-`<id>` is the SAMD21 128-bit hardware serial number encoded as 32 uppercase hex chars.
+`<id>` is the device's 128-bit hardware serial number encoded as 32 uppercase hex chars.
 
 ---
 
@@ -96,7 +96,7 @@ Query or set the flicker/sinus frequency in Hz.
 ```
 
 Range: 1–500 Hz  
-The value is the **desired** physical Hz; `FlickerController` applies the calibration table before commanding the hardware. Setting frequency does not change mode.
+Setting frequency does not change mode.
 
 ---
 
@@ -137,7 +137,7 @@ Range: 0–100 %
 
 #### `carrier [value]`
 
-Query or set the PWM carrier frequency in Hz. The carrier drives intensity modulation in `constant` and `sinus` modes; it has no effect in `flicker` mode. The value is persisted to EEPROM immediately.
+Query or set the PWM carrier frequency in Hz. The carrier drives intensity modulation in `constant` and `sinus` modes; it has no effect in `flicker` mode. The value is saved immediately.
 
 ```
 → carrier
@@ -154,70 +154,22 @@ Range: 1 000–50 000 Hz
 
 ---
 
-#### `calibration`
+#### `screensaver [value]`
 
-Print the stored frequency calibration table.
-
-```
-→ calibration
-← OK CAL 0
-```
-
-*(no calibration stored)*
+Query or set the display screensaver timeout in seconds. The value is saved immediately.
 
 ```
-→ calibration
-← OK CAL 8 1:1;5:5;10:10;25:26;50:51;100:103;200:206;500:515
+→ screensaver
+← OK 10
+
+→ screensaver 60
+← OK
+
+→ screensaver 0
+← ERROR out of range (1-600 s)
 ```
 
-*(8 points stored)*
-
-Payload format: `OK CAL <count> [cmd1:meas1;cmd2:meas2;…]`  
-
-- `count` — number of stored calibration points.  
-- Each pair is `<commanded_hz>:<measured_hz>` separated by `;`.
-
----
-
-#### `calibrate`
-
-Start the interactive frequency calibration wizard.
-
-The wizard drives the LED at each of 8 nominal frequencies (1, 5, 10, 25, 50, 100, 200, 500 Hz) in sequence. At each step, the device replies with a prompt; the user measures the actual output frequency and sends it as a plain integer.
-
-**Wizard session:**
-
-```
-→ calibrate
-← OK WIZARD 1/8 1        # step/total, target Hz
-
-→ 1                       # measured Hz (integer)
-← OK WIZARD 2/8 5
-
-→ 5
-← OK WIZARD 3/8 10
-
-→ 11
-← OK WIZARD 4/8 25
-…
-→ 519
-← OK WIZARD DONE          # table saved, prior mode restored
-```
-
-**Wizard prompt format:** `OK WIZARD <step>/<total> <target_hz>`
-
-While the wizard is active, the shell is in measurement mode — any line that is not a valid unsigned integer receives `ERROR expected measured Hz as integer` and the step is re-prompted. No other commands are accepted until the wizard completes.
-
-The wizard forces `flicker` mode during measurement (for a stable square-wave envelope) while preserving the user's configured duty cycle and intensity. Calibration bypass is enabled so raw Hz values drive the hardware. On completion, the prior mode and frequency are restored and calibration is applied immediately.
-
-**Errors:**
-
-```
-→ calibrate
-← ERROR wizard already active   # sent while wizard is in progress
-```
-
----
+Range: 1–600 s
 
 ### Error reference
 
@@ -232,8 +184,7 @@ The wizard forces `flicker` mode during measurement (for a stable square-wave en
 | `ERROR out of range (10-90 %)`                    | Duty cycle outside 10–90 %                |
 | `ERROR out of range (0-100 %)`                    | Intensity outside 0–100 %                 |
 | `ERROR out of range (1000-50000 Hz)`              | Carrier frequency outside 1 000–50 000 Hz |
-| `ERROR wizard already active`                     | `calibrate` sent while wizard running     |
-| `ERROR expected measured Hz as integer`           | Non-integer sent during wizard            |
+| `ERROR out of range (1-600 s)`                    | Screensaver timeout outside 1–600 s       |
 
 
 ---
@@ -268,10 +219,6 @@ Returns the current mode and all parameters.
   "intensity": 100
 }
 ```
-
-`frequency` reflects the user's **desired** Hz value, not the calibrated command value sent to hardware.
-
----
 
 ### `POST /api/off`
 
@@ -349,56 +296,30 @@ Same pattern. POST body: `{ "value": 80 }`.
 
 ```json
 { "error": "Not found" }      // 404 — unknown path
-{ "error": "Bad request" }    // 400 — unknown API endpoint
+{ "error": "Bad request" }    // 400 — unsupported /api request (unknown endpoint or wrong method)
 ```
 
-Note: the mode-set POST endpoints (`/api/flicker`, `/api/sinus`, etc.) do **not** validate individual parameter ranges — out-of-range values are silently clamped by `FlickerController`. Use the ASCII shell if you need explicit range errors.
+Note: the mode-set POST endpoints (`/api/flicker`, `/api/sinus`, etc.) do **not** return range-validation errors for individual parameters — out-of-range values are silently clamped. Use the ASCII shell if you need explicit range errors.
 
 ---
 
 ### Web UI
 
 `GET /` — HTML control page for interactive use.  
-`GET /config` — HTML network configuration page (DHCP, static IP/gateway/subnet, PWM carrier frequency).  
+`GET /config` — HTML network configuration page (DHCP, Telnet enable/disable, static IP/gateway/subnet, PWM carrier frequency).  
 `POST /config` — Submit configuration form. Changes take effect on next boot for network settings.
-
----
-
-## Frequency Calibration
-
-### Concept
-
-Hardware timer resolution means the actual output frequency deviates slightly from the commanded value, especially at the low and high ends of the range. The calibration table stores (commanded Hz, measured Hz) pairs from a one-time wizard run. When a desired frequency `D` is requested, `FlickerController` computes the command value `C` such that the hardware actually outputs `D` Hz, using piecewise-linear inverse interpolation over the stored pairs.
-
-### Math
-
-Points are stored sorted by commanded Hz (the wizard steps are monotonically increasing). For a desired frequency `D`:
-
-1. If the table has fewer than 2 points → identity (`C = D`).
-2. If `D ≤ meas[0]` → clamp to `cmd[0]`.
-3. If `D ≥ meas[n-1]` → clamp to `cmd[n-1]`.
-4. Otherwise find `i` where `meas[i] ≤ D ≤ meas[i+1]` and interpolate:
-
-```
-C = cmd[i] + (D - meas[i]) × (cmd[i+1] - cmd[i]) / (meas[i+1] - meas[i])
-```
-
-Integer arithmetic; uses 64-bit intermediate to avoid overflow.
-
-### Persistence
-
-The calibration table is stored in EEPROM (SAMD21 flash emulation via `FlashStorage_SAMD`) as part of `StoredConfig` (magic `0x464C4353`). It is treated as factory data and is **not** cleared by a factory reset. Re-running `calibrate` replaces the entire table.
 
 ---
 
 ## Network configuration
 
-Configured via the `/config` web page or directly in EEPROM. Stored fields:
+Configured via the `/config` web page. Stored fields:
 
 
 | Field          | Default |
 | -------------- | ------- |
 | DHCP           | enabled |
+| Telnet (TCP 23) | disabled |
 | Static IP      | 0.0.0.0 |
 | Gateway        | 0.0.0.0 |
 | Subnet         | 0.0.0.0 |
@@ -406,6 +327,7 @@ Configured via the `/config` web page or directly in EEPROM. Stored fields:
 
 
 The PWM carrier frequency (1 000–50 000 Hz) controls the intensity modulation rate in `constant` and `sinus` modes. It has no effect in `flicker` mode.
+When DHCP is disabled, the configured static IP, gateway, and subnet values are used at boot.
 
 Network changes take effect after a power cycle.
 
@@ -440,4 +362,4 @@ mDNS is always enabled when Ethernet has a valid IP. No configuration required.
 
 Short press on set button wakes the display from screensaver.
 
-Hold set button for **10 s** to perform a factory reset: network settings and PWM carrier Hz are cleared to defaults. The frequency calibration table is **preserved**.
+Hold set button for **10 s** to perform a factory reset: network settings and PWM carrier Hz are cleared to defaults.
