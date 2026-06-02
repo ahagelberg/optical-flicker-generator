@@ -1,9 +1,10 @@
 #include "SocketServer.h"
 #include "CommandShell.h"
+#include "ConfigStore.h"
 #include "Config.h"
 
-SocketServer::SocketServer(CommandShell& shell)
-    : shell_(shell), server_(SOCKET_PORT), lineLen_(0), lastReceivedMs_(0) {
+SocketServer::SocketServer(CommandShell& shell, ConfigStore& config)
+    : shell_(shell), config_(config), server_(SOCKET_PORT), lineLen_(0), lastReceivedMs_(0) {
     lineBuffer_[0] = '\0';
 }
 
@@ -13,6 +14,12 @@ void SocketServer::begin() {
 
 void SocketServer::poll() {
     const unsigned long now = millis();
+    if (!config_.getTelnetEnabled()) {
+        if (client_ && client_.connected()) client_.stop();
+        lineLen_ = 0;
+        lineBuffer_[0] = '\0';
+        return;
+    }
     if (!client_ || !client_.connected()) {
         client_ = server_.accept();
         lineLen_ = 0;

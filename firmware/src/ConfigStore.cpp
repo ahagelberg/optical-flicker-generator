@@ -4,7 +4,8 @@
 
 ConfigStore::ConfigStore()
     : useDhcp_(true), carrierHz_(DEFAULT_CARRIER_HZ),
-      screensaverTimeoutS_(DEFAULT_DISPLAY_SCREENSAVER_S) {
+      screensaverTimeoutS_(DEFAULT_DISPLAY_SCREENSAVER_S),
+      telnetEnabled_(false) {
     memset(ip_, 0, 4);
     memset(gateway_, 0, 4);
     memset(subnet_, 0, 4);
@@ -18,6 +19,10 @@ void ConfigStore::load() {
     EEPROM.get(0, c);
     if (c.magic == CONFIG_MAGIC) {
         applyStored(c);
+    } else if (c.magic == CONFIG_MAGIC_V3) {
+        StoredConfigV3 legacy;
+        EEPROM.get(0, legacy);
+        applyStoredV3(legacy);
     } else {
         resetToDefaults();
     }
@@ -32,6 +37,7 @@ void ConfigStore::save() {
 
 void ConfigStore::resetToDefaults() {
     useDhcp_ = true;
+    telnetEnabled_ = false;
     memset(ip_, 0, 4);
     memset(gateway_, 0, 4);
     memset(subnet_, 0, 4);
@@ -41,8 +47,27 @@ void ConfigStore::resetToDefaults() {
        not user configuration. Clear it only by running the calibration wizard again. */
 }
 
+void ConfigStore::applyStoredV3(const StoredConfigV3& c) {
+    useDhcp_ = c.useDhcp;
+    telnetEnabled_ = false;
+    memcpy(ip_, c.ip, 4);
+    memcpy(gateway_, c.gateway, 4);
+    memcpy(subnet_, c.subnet, 4);
+    carrierHz_ = (c.carrierHz >= MIN_CARRIER_HZ && c.carrierHz <= MAX_CARRIER_HZ)
+        ? c.carrierHz : DEFAULT_CARRIER_HZ;
+    screensaverTimeoutS_ = (c.screensaverTimeoutS >= MIN_DISPLAY_SCREENSAVER_S
+            && c.screensaverTimeoutS <= MAX_DISPLAY_SCREENSAVER_S)
+        ? c.screensaverTimeoutS : DEFAULT_DISPLAY_SCREENSAVER_S;
+    cal_.count = c.calCount <= CAL_MAX_POINTS ? c.calCount : 0;
+    for (uint8_t i = 0; i < cal_.count; i++) {
+        cal_.cmdHz[i] = c.calCmdHz[i];
+        cal_.measHz[i] = c.calMeasHz[i];
+    }
+}
+
 void ConfigStore::applyStored(const StoredConfig& c) {
     useDhcp_ = c.useDhcp;
+    telnetEnabled_ = c.telnetEnabled;
     memcpy(ip_, c.ip, 4);
     memcpy(gateway_, c.gateway, 4);
     memcpy(subnet_, c.subnet, 4);
@@ -61,6 +86,7 @@ void ConfigStore::applyStored(const StoredConfig& c) {
 void ConfigStore::toStored(StoredConfig& c) const {
     c.magic = CONFIG_MAGIC;
     c.useDhcp = useDhcp_;
+    c.telnetEnabled = telnetEnabled_;
     memcpy(c.ip, ip_, 4);
     memcpy(c.gateway, gateway_, 4);
     memcpy(c.subnet, subnet_, 4);

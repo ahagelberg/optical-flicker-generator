@@ -22,7 +22,7 @@ FlickerController flickerController(ledDriver, freqCal);
 CommandShell commandShell(flickerController, freqCal, configStore);
 SerialCommand serialCommand(commandShell);
 Display display(flickerController, configStore);
-SocketServer socketServer(commandShell);
+SocketServer socketServer(commandShell, configStore);
 WebServer webServer(flickerController, configStore);
 ResetButton resetButton(configStore);
 MdnsAdvertiser mdnsAdvertiser;

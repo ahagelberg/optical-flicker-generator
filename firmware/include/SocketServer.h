@@ -6,12 +6,13 @@
 #include "Config.h"
 
 class CommandShell;
+class ConfigStore;
 
 /* Thin I/O adapter: accepts one Ethernet client at a time on SOCKET_PORT,
    assembles lines, forwards to CommandShell (same commands as Serial). */
 class SocketServer {
 public:
-    explicit SocketServer(CommandShell& shell);
+    SocketServer(CommandShell& shell, ConfigStore& config);
     SocketServer(const SocketServer&) = delete;
     SocketServer& operator=(const SocketServer&) = delete;
 
@@ -20,6 +21,7 @@ public:
 
 private:
     CommandShell& shell_;
+    ConfigStore& config_;
     EthernetServer server_;
     EthernetClient client_;
     char lineBuffer_[PROTOCOL_CMD_LINE_BUFFER_MAX];

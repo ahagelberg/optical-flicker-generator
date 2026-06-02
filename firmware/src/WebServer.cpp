@@ -272,6 +272,12 @@ void WebServer::sendConfigPage(EthernetClient& client) {
                  " onchange=\"dhcpToggle()\"");
     if (config_.getUseDhcp()) client.print(" checked");
     client.println(">Use DHCP</label></div>");
+    client.print("<div class=\"f\"><label>"
+                 "<input type=\"checkbox\" name=\"telnet\" value=\"1\" style=\"width:auto;margin-right:6px\"");
+    if (config_.getTelnetEnabled()) client.print(" checked");
+    client.println(">Enable Telnet access (port 23)</label></div>");
+    client.println("<div class=\"hint\">Disabled by default. Enable only on trusted networks.</div>");
+    client.println("<div class=\"f\"><label>Static IP settings</label></div>");
     client.print("<div id=\"static\" style=\"display:");
     client.print(config_.getUseDhcp() ? "none" : "block");
     client.println("\">");
@@ -360,6 +366,9 @@ static const char* getFormValue(const char* body, const char* key, char* buf, si
 
 void WebServer::parseConfigPost(const char* body) {
     char buf[32];
+    bool telnetEnabled = getFormValue(body, "telnet", buf, sizeof(buf))
+        && (buf[0] == '1' || strcasecmp(buf, "on") == 0);
+    config_.setTelnetEnabled(telnetEnabled);
     if (getFormValue(body, "carrier", buf, sizeof(buf))) {
         unsigned int hz = 0;
         if (sscanf(buf, "%u", &hz) == 1) {
