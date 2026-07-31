@@ -1,0 +1,20 @@
+Model				Manufacturer	Description								Count	á-price (SEK)	price (SEK)
+ABX00012			Arduino			Arduino MKR ZERO Microcontroller		1		313.00			313.00
+ASX00006			Arduino			Arduino MKR ETH-shield					1		328.00			328.00
+TSR 1-2450			Traco			TracoPower voltage reg 5V 1A			1		67.00			67.00
+IRLML6344TRPBF		Infineon		MOSFET N-ch 5A 30V SOT-23				4		5.92			23.68
+B340AE-13			DiodesZetex		Schottky-diode 40V 3A SMA				4		1.81			7.24
+									Resistor 220R 0805						4		0.10			0.40
+									Resistor 10K 0805						4		0.10			0.40
+EEEFK1H221GP		Panasonic		Electrolytic 220uF 50V SMD				1		12.00			12.00
+MDOB128064V2V-WI	Midas			OLED display 0.96" 128x64px				1		156.00			156.00	
+1213C BLACK			APEM			Tryckknapp panel 12.2mm					1		67.00			67.00
+XHP-2				JST				XHP connector, female, 2-way, 2.5mm		6		0.74			4.44
+XHP-4				JST				XHP connector, female, 4-way, 2.5mm		1		1.20			1.20
+B2B-XH-A(LF)(SN)	JST				XHP PCB connector, male, 2-way, 2.5mm	4		1.76			7.04
+B4B-XH-A(LF)(SN)	JSP				XHP PCB connector, male, 4-way, 2.5mm	1		1.44			1.44
+SXH-001T-P0.6N		JST				XH contact element, crimp, AWG22-26		14		0.828			11.592
+GST120A24-P1M		Meanwell		AC/DC-adapter 120W 24VDC 5A				1		450.25			450.25
+RSTA4265			Radium			LED-list 5000mm 4000K 24V 1000lm/m		1		505.80			505.80
+124-618				RS PRO			M12 connector straight male 4-way		2		57.68			115.36
+M12A-04PFFS-SH8001	Amphenol		M12 connector panel female 4-way		2		65.30			130.60
