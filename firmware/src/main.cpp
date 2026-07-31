@@ -11,6 +11,11 @@
 #include "WebServer.h"
 #include "ResetButton.h"
 #include "MdnsAdvertiser.h"
+#include "DebugLog.h"
+#include "DeviceInfo.h"
+#include "NetworkFormat.h"
+#include "EthernetStatus.h"
+#include "SerialTx.h"
 #include <Ethernet.h>
 
 static const uint8_t MAC[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
@@ -22,15 +27,20 @@ FlickerController flickerController(ledDriver, freqCal);
 CommandShell commandShell(flickerController, freqCal, configStore);
 SerialCommand serialCommand(commandShell);
 Display display(flickerController, configStore);
-SocketServer socketServer(commandShell, configStore);
+SocketServer socketServer(commandShell);
 WebServer webServer(flickerController, configStore);
 ResetButton resetButton(configStore);
 MdnsAdvertiser mdnsAdvertiser;
 
 void setup() {
+    /* OLED first — never block on USB CDC before user-visible boot feedback. */
     display.showBootSplash();
+    resetButton.begin();
+    Serial.begin(115200);
+    debugLog("booting...");
     configStore.load();
-    freqCal.load(configStore.getCalibrationData());
+    ConfigStore::CalibrationData calData = configStore.getCalibrationData();
+    freqCal.load(calData);
     flickerController.setCarrierHz(configStore.getCarrierHz());
     Ethernet.init(PIN_ETHERNET_CS);
     if (configStore.getUseDhcp()) {
@@ -43,20 +53,46 @@ void setup() {
         /* Fourth arg is DNS server; gateway is used until config stores DNS separately. */
         Ethernet.begin((uint8_t*)MAC, ip, gw, gw, sn);
     }
-    Serial.begin(115200);
+    ethernetPoll();
+    char idHex[DEVICE_INFO_ID_HEX_BUFFER_LEN];
+    DeviceInfo::writeDeviceIdHex(idHex, sizeof(idHex));
+    debugLogf("boot %s %s id=%s",
+              DeviceInfo::deviceType(), DeviceInfo::firmwareVersion(), idHex);
+    debugLogf("config dhcp=%u carrier=%lu Hz screensaver=%u s cal_points=%u",
+              (unsigned)configStore.getUseDhcp(),
+              (unsigned long)configStore.getCarrierHz(),
+              (unsigned)configStore.getScreensaverTimeoutS(),
+              (unsigned)calData.count);
+    {
+        char ipStr[IPV4_STRING_BUFFER_LEN];
+        formatIpv4(ethernetLocalIp(), ipStr, sizeof(ipStr));
+        debugLogf("ethernet ip=%s hardware=%s link=%s",
+                  ipStr, ethernetHardwareLabel(), ethernetLinkLabel());
+    }
     flickerController.begin();
     display.begin();
-    socketServer.begin();
-    webServer.begin();
-    mdnsAdvertiser.begin();
-    resetButton.begin();
+    if (ethernetHardwarePresent()) {
+        socketServer.begin();
+        webServer.begin();
+    }
+    debugLog("boot complete");
 }
 
 void loop() {
     serialCommand.poll();
-    socketServer.poll();
-    webServer.poll();
-    mdnsAdvertiser.poll();
+    serialTxPoll();
+    ethernetPoll();
+    static bool networkServicesActive = false;
+    if (ethernetIsUp()) {
+        socketServer.poll();
+        webServer.poll();
+        mdnsAdvertiser.poll();
+        networkServicesActive = true;
+    } else if (networkServicesActive) {
+        socketServer.stopClient();
+        mdnsAdvertiser.stop();
+        networkServicesActive = false;
+    }
     display.update();
     resetButton.poll();
 }

@@ -47,6 +47,7 @@
 
 #define CAL_MAX_POINTS 8
 
-#define PROTOCOL_RESPONSE_MAX 128
+/* Sized for single-line `status` key=value reply. */
+#define PROTOCOL_RESPONSE_MAX 384
 
 #endif

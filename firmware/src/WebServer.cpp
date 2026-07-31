@@ -4,6 +4,8 @@
 #include "Config.h"
 #include "DeviceInfo.h"
 #include "NetworkFormat.h"
+#include "DebugLog.h"
+#include "EthernetStatus.h"
 #include "favicon_data.h"
 #include <Ethernet.h>
 
@@ -118,14 +120,15 @@ WebServer::WebServer(FlickerController& flicker, ConfigStore& config)
 
 void WebServer::begin() {
     server_.begin();
+    debugLogf("http listen port=%u", (unsigned)HTTP_PORT);
 }
 
 void WebServer::poll() {
     EthernetClient client = server_.accept();
-    if (client) {
-        serveClient(client);
-        client.stop();
-    }
+    if (!client)
+        return;
+    serveClient(client);
+    client.stop();
 }
 
 static void skipToSpace(const char*& p) {
@@ -261,7 +264,7 @@ void WebServer::sendConfigPage(EthernetClient& client) {
     snprintf(ipBuf, sizeof(ipBuf), "%u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
     snprintf(gwBuf, sizeof(gwBuf), "%u.%u.%u.%u", gw[0], gw[1], gw[2], gw[3]);
     snprintf(snBuf, sizeof(snBuf), "%u.%u.%u.%u", sn[0], sn[1], sn[2], sn[3]);
-    formatIpv4(Ethernet.localIP(), currentIpBuf, sizeof(currentIpBuf));
+    formatIpv4(ethernetLocalIp(), currentIpBuf, sizeof(currentIpBuf));
     if (!currentIpBuf[0]) snprintf(currentIpBuf, sizeof(currentIpBuf), "--");
     sendPageHead(client, "Configuration", "Network &amp; Hardware");
     client.println("<div class=\"nav\"><a class=\"lk\" href=\"/\">&#8592;&nbsp;Back to control</a></div>");
@@ -272,12 +275,6 @@ void WebServer::sendConfigPage(EthernetClient& client) {
                  " onchange=\"dhcpToggle()\"");
     if (config_.getUseDhcp()) client.print(" checked");
     client.println(">Use DHCP</label></div>");
-    client.print("<div class=\"f\"><label>"
-                 "<input type=\"checkbox\" name=\"telnet\" value=\"1\" style=\"width:auto;margin-right:6px\"");
-    if (config_.getTelnetEnabled()) client.print(" checked");
-    client.println(">Enable Telnet access (port 23)</label></div>");
-    client.println("<div class=\"hint\">Disabled by default. Enable only on trusted networks.</div>");
-    client.println("<div class=\"f\"><label>Static IP settings</label></div>");
     client.print("<div id=\"static\" style=\"display:");
     client.print(config_.getUseDhcp() ? "none" : "block");
     client.println("\">");
@@ -366,9 +363,6 @@ static const char* getFormValue(const char* body, const char* key, char* buf, si
 
 void WebServer::parseConfigPost(const char* body) {
     char buf[32];
-    bool telnetEnabled = getFormValue(body, "telnet", buf, sizeof(buf))
-        && (buf[0] == '1' || strcasecmp(buf, "on") == 0);
-    config_.setTelnetEnabled(telnetEnabled);
     if (getFormValue(body, "carrier", buf, sizeof(buf))) {
         unsigned int hz = 0;
         if (sscanf(buf, "%u", &hz) == 1) {

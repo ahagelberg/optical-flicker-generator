@@ -1,7 +1,7 @@
 #include "DeviceInfo.h"
 #include "Config.h"
 
-static const char DEVICE_INFO_FIRMWARE_VERSION[] = "1.0";
+static const char DEVICE_INFO_FIRMWARE_VERSION[] = "1.1";
 static const char DEVICE_INFO_TYPE[] = "FLICKER_DEVICE";
 
 #define SAMD21_SERIAL_WORD_0 *(volatile uint32_t*)(0x0080A00C)

@@ -1,6 +1,7 @@
 #include "ResetButton.h"
 #include "ConfigStore.h"
 #include "Config.h"
+#include "DebugLog.h"
 #include <sam.h>
 
 ResetButton::ResetButton(ConfigStore& config)
@@ -18,6 +19,7 @@ void ResetButton::poll() {
             pressedSinceMs_ = now;
             wasPressed_ = true;
         } else if (now - pressedSinceMs_ >= BUTTON_HOLD_MS) {
+            debugLog("factory reset");
             config_.resetToDefaults();
             config_.save();
             NVIC_SystemReset();

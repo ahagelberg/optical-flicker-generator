@@ -3,10 +3,17 @@
 #include "ConfigStore.h"
 #include "DeviceInfo.h"
 #include "Config.h"
+#include "EthernetStatus.h"
+#include "NetworkFormat.h"
+#include "SerialTx.h"
+#include <sam.h>
 
 /* Nominal Hz targets for the calibration wizard. Must not exceed CAL_MAX_POINTS. */
 static const uint16_t kCalNominalHz[] = {1, 5, 10, 25, 50, 100, 200, 500};
 static const uint8_t kCalStepCount = (uint8_t)(sizeof(kCalNominalHz) / sizeof(kCalNominalHz[0]));
+
+/* Bound reboot drain attempts so a missing USB host cannot hang forever. */
+static const int SERIAL_TX_REBOOT_DRAIN_POLLS = 200;
 
 static void toLower(char* s) {
     for (; *s; s++) {
@@ -14,17 +21,37 @@ static void toLower(char* s) {
     }
 }
 
+static bool isUsbSerial(Print& out) {
+    return &out == static_cast<Print*>(&Serial);
+}
+
 CommandShell::CommandShell(FlickerController& flicker, FrequencyCalibration& cal, ConfigStore& store)
     : flicker_(flicker), cal_(cal), store_(store),
       wizardActive_(false), wizardStepIdx_(0),
-      wizardSavedMode_(FlickerMode::Off), wizardSavedFreqHz_(DEFAULT_FREQ_HZ) {}
+      wizardSavedMode_(FlickerMode::Off), wizardSavedFreqHz_(DEFAULT_FREQ_HZ),
+      rebootPending_(false) {}
+
+void CommandShell::executeAndReply(const char* line, Print& out) {
+    char response[PROTOCOL_RESPONSE_MAX];
+    executeLine(line, response, sizeof(response));
+    if (isUsbSerial(out)) {
+        serialTxPrintln(response);
+    } else {
+        out.println(response);
+        out.flush();
+    }
+    if (!rebootPending_)
+        return;
+    rebootPending_ = false;
+    if (isUsbSerial(out)) {
+        for (int i = 0; i < SERIAL_TX_REBOOT_DRAIN_POLLS && !serialTxEmpty(); i++)
+            serialTxPoll();
+    }
+    NVIC_SystemReset();
+}
 
 void CommandShell::executeLine(const char* line, char* buf, size_t len) {
     if (!line || !buf || len == 0) return;
-    if (wizardActive_) {
-        wizardHandleMeasurement(line, buf, len);
-        return;
-    }
     char cmd[PROTOCOL_PARSE_CMD_MAX];
     char args[PROTOCOL_PARSE_ARGS_MAX];
     args[0] = '\0';
@@ -33,11 +60,22 @@ void CommandShell::executeLine(const char* line, char* buf, size_t len) {
              (unsigned)(PROTOCOL_PARSE_CMD_MAX - 1), (unsigned)(PROTOCOL_PARSE_ARGS_MAX - 1));
     int n = sscanf(line, scanFmt, cmd, args);
     if (n < 1) {
+        if (wizardActive_) {
+            wizardHandleMeasurement(line, buf, len);
+            return;
+        }
         snprintf(buf, len, "ERROR empty command");
         return;
     }
     toLower(cmd);
     const char* a = n >= 2 ? args : "";
+    /* Allowed during calibration wizard so the session can be inspected or aborted via reboot. */
+    if (strcmp(cmd, "status") == 0)                             return cmdStatus(buf, len);
+    if (strcmp(cmd, "reboot") == 0)                             return cmdReboot(buf, len);
+    if (wizardActive_) {
+        wizardHandleMeasurement(line, buf, len);
+        return;
+    }
     if (strcmp(cmd, "identify") == 0)                            return cmdIdentify(buf, len);
     if (strcmp(cmd, "mode") == 0)                                return cmdMode(a, buf, len);
     if (strcmp(cmd, "frequency") == 0 || strcmp(cmd, "freq") == 0) return cmdFrequency(a, buf, len);
@@ -178,6 +216,43 @@ void CommandShell::cmdCalibrate(char* buf, size_t len) {
     /* Force flicker mode for stable envelope; duty/intensity remain as set by user. */
     flicker_.setFlicker(kCalNominalHz[0], flicker_.getDutyPercent(), flicker_.getIntensityPercent());
     wizardStartStep(buf, len);
+}
+
+void CommandShell::cmdStatus(char* buf, size_t len) {
+    char id[DEVICE_INFO_ID_HEX_BUFFER_LEN];
+    DeviceInfo::writeDeviceIdHex(id, sizeof(id));
+    char mdnsHost[MDNS_HOSTNAME_BUFFER_LEN];
+    DeviceInfo::writeMdnsHostname(mdnsHost, sizeof(mdnsHost));
+    char ipStr[IPV4_STRING_BUFFER_LEN];
+    formatIpv4(ethernetLocalIp(), ipStr, sizeof(ipStr));
+    if (!ipStr[0])
+        snprintf(ipStr, sizeof(ipStr), "0.0.0.0");
+
+    snprintf(buf, len,
+             "OK STATUS device=%s firmware=%s id=%s mode=%s frequency=%lu dutycycle=%u intensity=%u "
+             "carrier=%lu screensaver=%u dhcp=%u ip=%s ethernet=%s hardware=%s link=%s mdns=%s "
+             "uptime_ms=%lu",
+             DeviceInfo::deviceType(),
+             DeviceInfo::firmwareVersion(),
+             id,
+             flicker_.getModeString(),
+             (unsigned long)flicker_.getFrequencyHz(),
+             (unsigned)flicker_.getDutyPercent(),
+             (unsigned)flicker_.getIntensityPercent(),
+             (unsigned long)store_.getCarrierHz(),
+             (unsigned)store_.getScreensaverTimeoutS(),
+             (unsigned)store_.getUseDhcp(),
+             ipStr,
+             ethernetIsUp() ? "up" : "down",
+             ethernetHardwareLabel(),
+             ethernetLinkLabel(),
+             mdnsHost,
+             (unsigned long)millis());
+}
+
+void CommandShell::cmdReboot(char* buf, size_t len) {
+    rebootPending_ = true;
+    snprintf(buf, len, "OK");
 }
 
 void CommandShell::wizardHandleMeasurement(const char* line, char* buf, size_t len) {

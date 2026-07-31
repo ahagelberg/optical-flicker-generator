@@ -9,9 +9,7 @@ SerialCommand::SerialCommand(CommandShell& shell)
 
 void SerialCommand::processLine(const char* line) {
     if (!line || line[0] == '\0') return;
-    char response[PROTOCOL_RESPONSE_MAX];
-    shell_.executeLine(line, response, sizeof(response));
-    Serial.println(response);
+    shell_.executeAndReply(line, Serial);
 }
 
 void SerialCommand::poll() {

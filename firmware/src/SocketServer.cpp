@@ -1,30 +1,41 @@
 #include "SocketServer.h"
 #include "CommandShell.h"
-#include "ConfigStore.h"
 #include "Config.h"
+#include "DebugLog.h"
 
-SocketServer::SocketServer(CommandShell& shell, ConfigStore& config)
-    : shell_(shell), config_(config), server_(SOCKET_PORT), lineLen_(0), lastReceivedMs_(0) {
+SocketServer::SocketServer(CommandShell& shell)
+    : shell_(shell), server_(SOCKET_PORT), clientActive_(false), lineLen_(0), lastReceivedMs_(0) {
     lineBuffer_[0] = '\0';
 }
 
 void SocketServer::begin() {
     server_.begin();
+    debugLogf("socket listen port=%u", (unsigned)SOCKET_PORT);
+}
+
+void SocketServer::stopClient() {
+    if (!clientActive_)
+        return;
+    client_.stop();
+    clientActive_ = false;
+    lineLen_ = 0;
+    lineBuffer_[0] = '\0';
+    debugLog("socket client disconnected");
 }
 
 void SocketServer::poll() {
     const unsigned long now = millis();
-    if (!config_.getTelnetEnabled()) {
-        if (client_ && client_.connected()) client_.stop();
-        lineLen_ = 0;
-        lineBuffer_[0] = '\0';
-        return;
-    }
     if (!client_ || !client_.connected()) {
+        if (clientActive_)
+            stopClient();
         client_ = server_.accept();
         lineLen_ = 0;
         lineBuffer_[0] = '\0';
         lastReceivedMs_ = now;
+        if (client_) {
+            clientActive_ = true;
+            debugLog("socket client connected");
+        }
         return;
     }
     while (client_.available() > 0) {
@@ -38,9 +49,7 @@ void SocketServer::poll() {
         if (c == '\n' || c == '\r') {
             lineBuffer_[lineLen_] = '\0';
             if (lineLen_ > 0) {
-                char response[PROTOCOL_RESPONSE_MAX];
-                shell_.executeLine(lineBuffer_, response, sizeof(response));
-                client_.println(response);
+                shell_.executeAndReply(lineBuffer_, client_);
                 lineLen_ = 0;
             }
             while (client_.available() > 0) {

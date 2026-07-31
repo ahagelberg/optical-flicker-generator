@@ -18,6 +18,9 @@ public:
     /* Parse and execute one complete line; writes null-terminated reply into buf. */
     void executeLine(const char* line, char* buf, size_t len);
 
+    /* Execute line, print reply, flush, then reboot if requested. */
+    void executeAndReply(const char* line, Print& out);
+
 private:
     void cmdIdentify(char* buf, size_t len);
     void cmdMode(const char* args, char* buf, size_t len);
@@ -28,6 +31,8 @@ private:
     void cmdScreensaver(const char* args, char* buf, size_t len);
     void cmdCalibration(char* buf, size_t len);
     void cmdCalibrate(char* buf, size_t len);
+    void cmdStatus(char* buf, size_t len);
+    void cmdReboot(char* buf, size_t len);
     void wizardHandleMeasurement(const char* line, char* buf, size_t len);
     void wizardStartStep(char* buf, size_t len);
     void wizardFinish(char* buf, size_t len);
@@ -40,6 +45,7 @@ private:
     uint8_t wizardStepIdx_;
     FlickerMode wizardSavedMode_;
     uint32_t wizardSavedFreqHz_;
+    bool rebootPending_;
 };
 
 #endif
