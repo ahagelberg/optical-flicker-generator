@@ -1,3 +1,4 @@
 .history/
 gerber_to_order/
-production/backups/*
+Optical Flicker Generator Main Board-backups/
+production/backups
