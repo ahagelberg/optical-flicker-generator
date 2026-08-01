@@ -18,8 +18,6 @@
 #include "SerialTx.h"
 #include <Ethernet.h>
 
-static const uint8_t MAC[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
-
 ConfigStore configStore;
 FrequencyCalibration freqCal;
 LedDriver ledDriver;
@@ -43,21 +41,28 @@ void setup() {
     freqCal.load(calData);
     flickerController.setCarrierHz(configStore.getCarrierHz());
     Ethernet.init(PIN_ETHERNET_CS);
+    uint8_t mac[DEVICE_INFO_MAC_LEN];
+    DeviceInfo::writeMacAddress(mac, sizeof(mac));
     if (configStore.getUseDhcp()) {
-        Ethernet.begin((uint8_t*)MAC);
+        Ethernet.begin(mac);
     } else {
         uint8_t ip[4], gw[4], sn[4];
         configStore.getIp(ip);
         configStore.getGateway(gw);
         configStore.getSubnet(sn);
         /* Fourth arg is DNS server; gateway is used until config stores DNS separately. */
-        Ethernet.begin((uint8_t*)MAC, ip, gw, gw, sn);
+        Ethernet.begin(mac, ip, gw, gw, sn);
     }
     ethernetPoll();
     char idHex[DEVICE_INFO_ID_HEX_BUFFER_LEN];
     DeviceInfo::writeDeviceIdHex(idHex, sizeof(idHex));
     debugLogf("boot %s %s id=%s",
               DeviceInfo::deviceType(), DeviceInfo::firmwareVersion(), idHex);
+    {
+        char macStr[DEVICE_INFO_MAC_STRING_BUFFER_LEN];
+        DeviceInfo::writeMacAddressString(macStr, sizeof(macStr));
+        debugLogf("ethernet mac=%s", macStr);
+    }
     debugLogf("config dhcp=%u carrier=%lu Hz screensaver=%u s cal_points=%u",
               (unsigned)configStore.getUseDhcp(),
               (unsigned long)configStore.getCarrierHz(),

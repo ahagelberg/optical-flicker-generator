@@ -40,6 +40,30 @@ void DeviceInfo::writeMdnsHostname(char* buf, size_t len) {
     buf[MDNS_HOSTNAME_PREFIX_LEN + MDNS_HOSTNAME_SUFFIX_LEN] = '\0';
 }
 
+void DeviceInfo::writeMacAddress(uint8_t* mac, size_t len) {
+    if (mac == nullptr || len < DEVICE_INFO_MAC_LEN) return;
+    /* Last 6 bytes of the 128-bit unique ID; mark locally administered unicast. */
+    const uint32_t w2 = SAMD21_SERIAL_WORD_2;
+    const uint32_t w3 = SAMD21_SERIAL_WORD_3;
+    mac[0] = (uint8_t)(((w2 >> 16) & 0xFCu) | 0x02u);
+    mac[1] = (uint8_t)(w2 >> 8);
+    mac[2] = (uint8_t)(w2);
+    mac[3] = (uint8_t)(w3 >> 24);
+    mac[4] = (uint8_t)(w3 >> 16);
+    mac[5] = (uint8_t)(w3 >> 8);
+}
+
+void DeviceInfo::writeMacAddressString(char* buf, size_t len) {
+    if (buf == nullptr || len < DEVICE_INFO_MAC_STRING_BUFFER_LEN) {
+        if (buf != nullptr && len > 0) buf[0] = '\0';
+        return;
+    }
+    uint8_t mac[DEVICE_INFO_MAC_LEN];
+    writeMacAddress(mac, sizeof(mac));
+    snprintf(buf, len, "%02X:%02X:%02X:%02X:%02X:%02X",
+             mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+}
+
 const char* DeviceInfo::deviceType() {
     return DEVICE_INFO_TYPE;
 }
