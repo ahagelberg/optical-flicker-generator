@@ -1,6 +1,8 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+#define FIRMWARE_VERSION      "1.2"
+
 /* MKR Zero + MKR ETH shield */
 #define PIN_LED_OUTPUT_A      2   /* TCC1 WO[0] */
 #define PIN_LED_OUTPUT_B      3   /* TCC1 WO[1] — same waveform as A */

@@ -44,7 +44,10 @@ static void sendFaviconLink(EthernetClient& client) {
     client.println("<link rel=\"icon\" type=\"image/png\" href=\"/favicon.ico\">");
 }
 
-static void sendPageHead(EthernetClient& client, const char* title, const char* subtitle) {
+static const char PAGE_PRODUCT_NAME[] = "Optical Flicker Generator";
+
+static void sendPageHead(EthernetClient& client, const char* pageHeading,
+                         const char* actionHref, const char* actionLabel) {
     client.println("HTTP/1.1 200 OK");
     client.println("Content-Type: text/html");
     client.println("Connection: close");
@@ -52,7 +55,9 @@ static void sendPageHead(EthernetClient& client, const char* title, const char* 
     client.print("<!DOCTYPE html><html lang=\"en\"><head>"
                  "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
                  "<title>");
-    client.print(title);
+    client.print(PAGE_PRODUCT_NAME);
+    client.print(" &mdash; ");
+    client.print(pageHeading);
     client.println("</title>");
     sendFaviconLink(client);
     /* Colour palette derived from Invize brand: dark charcoal base, violet accent */
@@ -60,9 +65,13 @@ static void sendPageHead(EthernetClient& client, const char* title, const char* 
         ":root{--bg:#18181b;--sf:#27272a;--ac:#8b5cf6;--ah:#7c3aed;--tx:#fafafa;--mu:#a1a1aa;--bd:#3f3f46;--in:#1f1f23}"
         "*{box-sizing:border-box;margin:0;padding:0}"
         "body{background:var(--bg);color:var(--tx);font:14px/1.5 system-ui,sans-serif;min-height:100vh;display:flex;flex-direction:column}"
-        "header{background:var(--sf);border-bottom:1px solid var(--bd);padding:12px 20px;display:flex;align-items:center;gap:12px}"
+        "header{background:var(--sf);border-bottom:1px solid var(--bd);padding:12px 20px;"
+        "display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px}"
+        "header .brand{display:flex;align-items:center;gap:12px}"
         "header h1{font-size:15px;font-weight:600}"
-        "header .sub{font-size:11px;color:var(--mu)}"
+        "header .ver{font-size:12px;font-weight:400;color:var(--mu);margin-left:8px}"
+        "header .page{font-size:16px;font-weight:600;text-align:center}"
+        "header .actions{justify-self:end}"
         "main{flex:1;padding:20px;max-width:460px;width:100%;margin:0 auto}"
         ".card{background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:18px;margin-bottom:14px}"
         ".card h2{font-size:10px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.07em;margin-bottom:14px}"
@@ -74,23 +83,33 @@ static void sendPageHead(EthernetClient& client, const char* title, const char* 
         ".row{display:flex;gap:10px}.row .f{flex:1}"
         "button{width:100%;background:var(--ac);color:#fff;border:none;border-radius:6px;padding:9px;font-size:14px;font-weight:500;cursor:pointer}"
         "button:hover{background:var(--ah)}"
-        "a.lk{color:var(--ac);font-size:13px;text-decoration:none}"
-        "a.lk:hover{text-decoration:underline}"
-        ".nav{margin-bottom:14px}"
-        ".brand{margin-left:auto;text-align:right;line-height:1.3}"
-        ".brand b{color:var(--ac);font-size:13px;letter-spacing:.04em}"
-        ".brand small{display:block;font-size:10px;color:var(--mu)}"
+        "a.hdr-btn{display:inline-flex;align-items:center;gap:6px;"
+        "background:var(--ac);color:#fff;text-decoration:none;border-radius:6px;"
+        "padding:12px 20px;font-size:15px;font-weight:600;white-space:nowrap}"
+        "a.hdr-btn:hover{background:var(--ah)}"
         "footer{text-align:center;padding:14px;font-size:11px;color:var(--mu);border-top:1px solid var(--bd)}"
         "footer a{color:var(--mu)}"
         "</style></head><body>");
     client.println("<header>");
+    client.println("<div class=\"brand\">");
     client.println("<img src=\"/favicon.ico\" width=\"28\" height=\"28\">");
-    client.print("<div><h1>");
-    client.print(title);
-    client.print("</h1><span class=\"sub\">");
-    client.print(subtitle);
-    client.println("</span></div>");
-    client.println("<div class=\"brand\"><b>invize</b><small>Mechatronics Engineering<br>And Consulting</small></div>");
+    client.print("<h1>");
+    client.print(PAGE_PRODUCT_NAME);
+    client.print("<span class=\"ver\">v");
+    client.print(DeviceInfo::firmwareVersion());
+    client.println("</span></h1></div>");
+    client.print("<div class=\"page\">");
+    client.print(pageHeading);
+    client.println("</div>");
+    client.print("<div class=\"actions\">");
+    if (actionHref && actionLabel) {
+        client.print("<a class=\"hdr-btn\" href=\"");
+        client.print(actionHref);
+        client.print("\">");
+        client.print(actionLabel);
+        client.print("</a>");
+    }
+    client.println("</div>");
     client.println("</header><main>");
 }
 
@@ -188,8 +207,8 @@ void WebServer::serveClient(EthernetClient& client) {
 }
 
 void WebServer::sendControlPage(EthernetClient& client) {
-    sendPageHead(client, "Optical Flicker Generator", "Control Panel");
-    client.println("<div class=\"nav\"><a class=\"lk\" href=\"/config\">&#9881;&nbsp;Configuration</a></div>");
+    sendPageHead(client, "Control Panel",
+                 "/config", "&#9881;&nbsp;Configuration");
     client.println("<div class=\"card\"><h2>Mode</h2>"
                    "<div class=\"f\"><label>Operating mode</label>"
                    "<select name=\"mode\">"
@@ -266,8 +285,8 @@ void WebServer::sendConfigPage(EthernetClient& client) {
     snprintf(snBuf, sizeof(snBuf), "%u.%u.%u.%u", sn[0], sn[1], sn[2], sn[3]);
     formatIpv4(ethernetLocalIp(), currentIpBuf, sizeof(currentIpBuf));
     if (!currentIpBuf[0]) snprintf(currentIpBuf, sizeof(currentIpBuf), "--");
-    sendPageHead(client, "Configuration", "Network &amp; Hardware");
-    client.println("<div class=\"nav\"><a class=\"lk\" href=\"/\">&#8592;&nbsp;Back to control</a></div>");
+    sendPageHead(client, "Configure",
+                 "/", "&#8592;&nbsp;Back to control");
     client.println("<form method=\"post\" action=\"/config\">");
     client.println("<div class=\"card\"><h2>Network</h2>");
     client.print("<div class=\"f\"><label>"
